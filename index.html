@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+
+<title>Kafa Yılanı</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff69b4">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kafa Yılanı">
+<link rel="apple-touch-icon" href="icon-192.png">
+
+<style>
+body{
+  margin:0;
+  background:#1e3c72;
+  color:white;
+  font-family:Arial;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+}
+canvas{
+  margin-top:15px;
+  background:black;
+  border:4px solid white;
+  border-radius:12px;
+}
+#score{font-size:24px;margin:10px}
+#joystick{
+  position:fixed;
+  bottom:20px;
+  width:180px;height:180px;
+  background:rgba(255,255,255,.15);
+  border-radius:50%;
+}
+.joy{
+  position:absolute;
+  width:60px;height:60px;
+  background:rgba(255,255,255,.4);
+  border-radius:50%;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  font-size:28px;
+}
+#up{top:10px;left:60px}
+#down{bottom:10px;left:60px}
+#left{left:10px;top:60px}
+#right{right:10px;top:60px}
+</style>
+</head>
+
+<body>
+<h2>Kafa Yılanı</h2>
+<div id="score">Skor: 0</div>
+<canvas id="game" width="360" height="360"></canvas>
+
+<div id="joystick">
+  <div class="joy" id="up">↑</div>
+  <div class="joy" id="down">↓</div>
+  <div class="joy" id="left">←</div>
+  <div class="joy" id="right">→</div>
+</div>
+
+<script>
+const c = document.getElementById("game");
+const ctx = c.getContext("2d");
+const size = 18;
+const cell = c.width / size;
+
+let snake, dx, dy, food, score, loop, running=false;
+
+const headImg = new Image();
+headImg.src = "https://i.imgur.com/IPByPE6.jpeg";
+const foodImg = new Image();
+foodImg.src = "https://i.imgur.com/IAI6oAT.png";
+
+function start(){
+  if(running) return;
+  running=true;
+  snake=[{x:9,y:9}];
+  dx=1; dy=0;
+  score=0;
+  newFood();
+  document.getElementById("score").innerText="Skor: 0";
+  loop=setInterval(update,220);
+}
+
+function newFood(){
+  do{
+    food={x:Math.floor(Math.random()*size),y:Math.floor(Math.random()*size)};
+  }while(snake.some(s=>s.x==food.x&&s.y==food.y));
+}
+
+function draw(){
+  ctx.fillStyle="#000";
+  ctx.fillRect(0,0,c.width,c.height);
+
+  ctx.fillStyle="#2ecc71";
+  for(let i=1;i<snake.length;i++){
+    ctx.fillRect(snake[i].x*cell+4,snake[i].y*cell+4,cell-8,cell-8);
+  }
+
+  if(foodImg.complete){
+    ctx.drawImage(foodImg,food.x*cell,food.y*cell,cell,cell);
+  }
+
+  if(headImg.complete){
+    ctx.drawImage(headImg,snake[0].x*cell,snake[0].y*cell,cell,cell);
+  }
+}
+
+function update(){
+  const h={x:snake[0].x+dx,y:snake[0].y+dy};
+
+  if(h.x<0||h.y<0||h.x>=size||h.y>=size||snake.some(s=>s.x==h.x&&s.y==h.y)){
+    clearInterval(loop);
+    alert("Oyun Bitti");
+    running=false;
+    return;
+  }
+
+  snake.unshift(h);
+  if(h.x==food.x&&h.y==food.y){
+    score++;
+    document.getElementById("score").innerText="Skor: "+score;
+    newFood();
+  }else snake.pop();
+
+  draw();
+}
+
+function setDir(x,y){
+  if(dx==-x&&dy==-y)return;
+  dx=x;dy=y;
+}
+
+function bind(id,x,y){
+  const b=document.getElementById(id);
+  b.addEventListener("touchstart",e=>{
+    e.preventDefault(); start(); setDir(x,y);
+  },{passive:false});
+  b.addEventListener("mousedown",()=>{start(); setDir(x,y);});
+}
+
+bind("up",0,-1);
+bind("down",0,1);
+bind("left",-1,0);
+bind("right",1,0);
+
+document.body.addEventListener("touchstart",start,{once:true});
+document.body.addEventListener("mousedown",start,{once:true});
+
+// Service Worker
+if("serviceWorker"in navigator){
+  navigator.serviceWorker.register("sw.js");
+}
+</script>
+</body>
+</html>
