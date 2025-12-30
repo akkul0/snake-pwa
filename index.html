@@ -3,21 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-
 <title>Kafa Yılanı</title>
 
-<!-- PWA -->
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ff69b4">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Kafa Yılanı">
-<link rel="apple-touch-icon" href="icon-192.png">
 
 <style>
 body{
   margin:0;
-  background:#1e3c72;
+  background:linear-gradient(135deg,#1e3c72,#2a5298);
   color:white;
   font-family:Arial;
   display:flex;
@@ -26,7 +22,7 @@ body{
 }
 canvas{
   margin-top:15px;
-  background:black;
+  background:#000;
   border:4px solid white;
   border-radius:12px;
 }
@@ -68,57 +64,110 @@ canvas{
 </div>
 
 <script>
-const c = document.getElementById("game");
-const ctx = c.getContext("2d");
-const size = 18;
-const cell = c.width / size;
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
 
-let snake, dx, dy, food, score, loop, running=false;
+const grid = 18;
+const cell = canvas.width / grid;
 
+// 🔥 GÖRSELLER BÜYÜTÜLDÜ
+const headSize = cell * 1.5;
+const foodSize = cell * 1.4;
+
+// FOTOĞRAFLAR
 const headImg = new Image();
 headImg.src = "https://i.imgur.com/IPByPE6.jpeg";
+
+const openMouthImg = new Image();
+openMouthImg.src = "https://i.imgur.com/cDsbEMV.jpeg";
+
 const foodImg = new Image();
 foodImg.src = "https://i.imgur.com/IAI6oAT.png";
 
+let snake, dx, dy, food, score;
+let loop, running = false;
+
+// 🍎 ISIRMA SESİ (iOS uyumlu)
+let audioCtx;
+function biteSound(){
+  if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = "triangle";
+  osc.frequency.setValueAtTime(900, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime+0.12);
+  gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime+0.12);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime+0.12);
+}
+
 function start(){
   if(running) return;
-  running=true;
-  snake=[{x:9,y:9}];
+  running = true;
+  snake = [{x:9,y:9}];
   dx=1; dy=0;
   score=0;
   newFood();
   document.getElementById("score").innerText="Skor: 0";
-  loop=setInterval(update,220);
+  loop = setInterval(update,220);
 }
 
 function newFood(){
   do{
-    food={x:Math.floor(Math.random()*size),y:Math.floor(Math.random()*size)};
-  }while(snake.some(s=>s.x==food.x&&s.y==food.y));
+    food={x:Math.floor(Math.random()*grid),y:Math.floor(Math.random()*grid)};
+  }while(snake.some(s=>s.x===food.x&&s.y===food.y));
 }
 
 function draw(){
   ctx.fillStyle="#000";
-  ctx.fillRect(0,0,c.width,c.height);
+  ctx.fillRect(0,0,canvas.width,canvas.height);
 
+  // Gövde
   ctx.fillStyle="#2ecc71";
   for(let i=1;i<snake.length;i++){
-    ctx.fillRect(snake[i].x*cell+4,snake[i].y*cell+4,cell-8,cell-8);
+    ctx.fillRect(
+      snake[i].x*cell+5,
+      snake[i].y*cell+5,
+      cell-10,
+      cell-10
+    );
   }
 
+  // Yem (BÜYÜK)
   if(foodImg.complete){
-    ctx.drawImage(foodImg,food.x*cell,food.y*cell,cell,cell);
+    ctx.drawImage(
+      foodImg,
+      food.x*cell-(foodSize-cell)/2,
+      food.y*cell-(foodSize-cell)/2,
+      foodSize,
+      foodSize
+    );
   }
 
-  if(headImg.complete){
-    ctx.drawImage(headImg,snake[0].x*cell,snake[0].y*cell,cell,cell);
+  // Baş – mesafeye göre ağız açılır
+  const head = snake[0];
+  const dist = Math.abs(head.x-food.x)+Math.abs(head.y-food.y);
+  const img = (dist<=1 && openMouthImg.complete) ? openMouthImg : headImg;
+
+  if(img.complete){
+    ctx.drawImage(
+      img,
+      head.x*cell-(headSize-cell)/2,
+      head.y*cell-(headSize-cell)/2,
+      headSize,
+      headSize
+    );
   }
 }
 
 function update(){
   const h={x:snake[0].x+dx,y:snake[0].y+dy};
 
-  if(h.x<0||h.y<0||h.x>=size||h.y>=size||snake.some(s=>s.x==h.x&&s.y==h.y)){
+  if(h.x<0||h.y<0||h.x>=grid||h.y>=grid||
+     snake.some(s=>s.x===h.x&&s.y===h.y)){
     clearInterval(loop);
     alert("Oyun Bitti");
     running=false;
@@ -126,26 +175,34 @@ function update(){
   }
 
   snake.unshift(h);
-  if(h.x==food.x&&h.y==food.y){
+
+  if(h.x===food.x&&h.y===food.y){
     score++;
+    biteSound();
     document.getElementById("score").innerText="Skor: "+score;
     newFood();
-  }else snake.pop();
-
+  }else{
+    snake.pop();
+  }
   draw();
 }
 
 function setDir(x,y){
-  if(dx==-x&&dy==-y)return;
-  dx=x;dy=y;
+  if(dx===-x&&dy===-y) return;
+  dx=x; dy=y;
 }
 
 function bind(id,x,y){
   const b=document.getElementById(id);
   b.addEventListener("touchstart",e=>{
-    e.preventDefault(); start(); setDir(x,y);
+    e.preventDefault();
+    start();
+    setDir(x,y);
   },{passive:false});
-  b.addEventListener("mousedown",()=>{start(); setDir(x,y);});
+  b.addEventListener("mousedown",()=>{
+    start();
+    setDir(x,y);
+  });
 }
 
 bind("up",0,-1);
@@ -156,8 +213,8 @@ bind("right",1,0);
 document.body.addEventListener("touchstart",start,{once:true});
 document.body.addEventListener("mousedown",start,{once:true});
 
-// Service Worker
-if("serviceWorker"in navigator){
+// PWA
+if("serviceWorker" in navigator){
   navigator.serviceWorker.register("sw.js");
 }
 </script>
