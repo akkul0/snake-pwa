@@ -27,6 +27,7 @@ canvas{
   border-radius:12px;
 }
 #score{font-size:24px;margin:10px}
+#highScore{font-size:18px;margin-bottom:5px;color:#ffd700;}
 #joystick{
   position:fixed;
   bottom:20px;
@@ -53,6 +54,7 @@ canvas{
 
 <body>
 <h2>Kafa Yılanı</h2>
+<div id="highScore">Rekor: 0</div>
 <div id="score">Skor: 0</div>
 <canvas id="game" width="360" height="360"></canvas>
 
@@ -70,11 +72,11 @@ const ctx = canvas.getContext("2d");
 const grid = 18;
 const cell = canvas.width / grid;
 
-// 🔥 GÖRSELLER BÜYÜTÜLDÜ
+// Görseller büyütüldü
 const headSize = cell * 1.5;
 const foodSize = cell * 1.4;
 
-// FOTOĞRAFLAR
+// Fotoğraflar
 const headImg = new Image();
 headImg.src = "https://i.imgur.com/IPByPE6.jpeg";
 
@@ -84,10 +86,15 @@ openMouthImg.src = "https://i.imgur.com/cDsbEMV.jpeg";
 const foodImg = new Image();
 foodImg.src = "https://i.imgur.com/IAI6oAT.png";
 
-let snake, dx, dy, food, score;
+// Oyun değişkenleri
+let snake, dx, dy, food, score, highScore;
 let loop, running = false;
 
-// 🍎 ISIRMA SESİ (iOS uyumlu)
+// LocalStorage’den rekor oku
+highScore = localStorage.getItem("highScore") || 0;
+document.getElementById("highScore").innerText = "Rekor: " + highScore;
+
+// Ses ve titreşim
 let audioCtx;
 function biteSound(){
   if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -104,6 +111,7 @@ function biteSound(){
   osc.stop(audioCtx.currentTime+0.12);
 }
 
+// Başlat
 function start(){
   if(running) return;
   running = true;
@@ -115,12 +123,14 @@ function start(){
   loop = setInterval(update,220);
 }
 
+// Yeni yem
 function newFood(){
   do{
     food={x:Math.floor(Math.random()*grid),y:Math.floor(Math.random()*grid)};
   }while(snake.some(s=>s.x===food.x&&s.y===food.y));
 }
 
+// Çizim
 function draw(){
   ctx.fillStyle="#000";
   ctx.fillRect(0,0,canvas.width,canvas.height);
@@ -128,57 +138,47 @@ function draw(){
   // Gövde
   ctx.fillStyle="#2ecc71";
   for(let i=1;i<snake.length;i++){
-    ctx.fillRect(
-      snake[i].x*cell+5,
-      snake[i].y*cell+5,
-      cell-10,
-      cell-10
-    );
+    ctx.fillRect(snake[i].x*cell+5,snake[i].y*cell+5,cell-10,cell-10);
   }
 
-  // Yem (BÜYÜK)
+  // Yem
   if(foodImg.complete){
-    ctx.drawImage(
-      foodImg,
-      food.x*cell-(foodSize-cell)/2,
-      food.y*cell-(foodSize-cell)/2,
-      foodSize,
-      foodSize
-    );
+    ctx.drawImage(foodImg,food.x*cell-(foodSize-cell)/2,food.y*cell-(foodSize-cell)/2,foodSize,foodSize);
   }
 
   // Baş – mesafeye göre ağız açılır
   const head = snake[0];
   const dist = Math.abs(head.x-food.x)+Math.abs(head.y-food.y);
   const img = (dist<=1 && openMouthImg.complete) ? openMouthImg : headImg;
-
   if(img.complete){
-    ctx.drawImage(
-      img,
-      head.x*cell-(headSize-cell)/2,
-      head.y*cell-(headSize-cell)/2,
-      headSize,
-      headSize
-    );
+    ctx.drawImage(img,head.x*cell-(headSize-cell)/2,head.y*cell-(headSize-cell)/2,headSize,headSize);
   }
 }
 
+// Güncelle
 function update(){
   const h={x:snake[0].x+dx,y:snake[0].y+dy};
 
-  if(h.x<0||h.y<0||h.x>=grid||h.y>=grid||
-     snake.some(s=>s.x===h.x&&s.y===h.y)){
+  if(h.x<0||h.y<0||h.x>=grid||h.y>=grid||snake.some(s=>s.x===h.x&&s.y===h.y)){
     clearInterval(loop);
-    alert("Oyun Bitti");
+    alert("Oyun Bitti! Skor: "+score);
     running=false;
+    // Rekor kaydet
+    if(score>highScore){
+      highScore=score;
+      localStorage.setItem("highScore",highScore);
+      document.getElementById("highScore").innerText="Rekor: "+highScore;
+    }
     return;
   }
 
   snake.unshift(h);
 
-  if(h.x===food.x&&h.y===food.y){
+  if(h.x===food.x && h.y===food.y){
     score++;
     biteSound();
+    // TİTREŞİM
+    if(navigator.vibrate) navigator.vibrate(100);
     document.getElementById("score").innerText="Skor: "+score;
     newFood();
   }else{
@@ -187,11 +187,13 @@ function update(){
   draw();
 }
 
+// Yön
 function setDir(x,y){
   if(dx===-x&&dy===-y) return;
   dx=x; dy=y;
 }
 
+// Butonlar
 function bind(id,x,y){
   const b=document.getElementById(id);
   b.addEventListener("touchstart",e=>{
